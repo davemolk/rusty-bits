@@ -1,0 +1,7 @@
+<https://www.denverpost.com/2025/01/28/ice-immigration-raids-aurora-denver-donald-trump/>; rel="original",
+<http://archive.md/timegate/https://www.denverpost.com/2025/01/28/ice-immigration-raids-aurora-denver-donald-trump/>; rel="timegate",
+<http://archive.md/20250128213048/https://www.denverpost.com/2025/01/28/ice-immigration-raids-aurora-denver-donald-trump/>; rel="first memento"; datetime="Tue, 28 Jan 2025 21:30:48 GMT",
+<http://archive.md/20250130174844/https://www.denverpost.com/2025/01/28/ice-immigration-raids-aurora-denver-donald-trump/>; rel="last memento"; datetime="Thu, 30 Jan 2025 17:48:44 GMT",
+<http://archive.md/20250130174844/https://www.denverpost.com/2025/01/28/ice-immigration-raids-aurora-denver-donald-trump/>; rel="memento"; datetime="Thu, 30 Jan 2025 17:48:44 GMT",
+<http://archive.md/20250130174844/https://www.denverpost.com/2025/01/28/ice-immigration-raids-aurora-denver-donald-trump/>; rel="memento"; datetime="Thu, 30 Jan 2025 17:48:44 GMT",
+<http://archive.md/timemap/https://www.denverpost.com/2025/01/28/ice-immigration-raids-aurora-denver-donald-trump/>; rel="self"; type="application/link-format"; from="Tue, 28 Jan 2025 21:30:48 GMT"; until="Thu, 30 Jan 2025 17:48:44 GMT"

@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use arboard::Clipboard;
 use clap::{Parser, ValueEnum};
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -60,7 +61,19 @@ pub struct Args {
     pub dry: bool,
 }
 
-pub fn format_msg(args: Args) -> String {
+pub fn run(args: Args) {
+    let dry = args.dry;
+    let msg = format_msg(args);
+    if !dry {
+        let mut clipboard = Clipboard::new().unwrap();
+        clipboard.set_text(&msg).unwrap();
+        println!("commit copied to clipboard");
+    } else {
+        println!("{msg}")
+    }
+}
+
+fn format_msg(args: Args) -> String {
     let exc = if args.breaking { "!" } else { "" };
     let scope = args.scope.map_or_else(String::new, |s| format!("({s})"));
     let body = args.body.map_or_else(String::new, |b| format!("\n\n{b}")); 
