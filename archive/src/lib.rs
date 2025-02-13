@@ -17,7 +17,7 @@ pub struct Args {
     /// url to search
     #[arg(short, long)]
     url: String,
-    /// return the oldest archived (returns newest by deafult)
+    /// return the oldest archived (returns newest by default)
     #[arg(short, long)]
     oldest: bool,
     /// return all archived
