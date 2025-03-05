@@ -1,0 +1,13 @@
+[package]
+name = "cff"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.26", features = ["derive"] }
+anyhow = "1.0"
+url = "2.5.4"
+serde_json = "1.0.139"
+serde = "1.0.218"
+serde_yaml = "0.9.34"
+toml = "0.8.20"
