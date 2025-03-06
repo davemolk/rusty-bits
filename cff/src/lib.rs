@@ -1,50 +1,50 @@
 use clap::Parser;
 use anyhow::{anyhow, Result};
 use std::path::{PathBuf, Path};
-use std::fs::{self, File};
-use std::io::{self, BufReader, Write};
+use std::fs::File;
+use std::io::{self, BufReader, Read, Write};
 use std::collections::HashMap;
 
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
 enum Format {
-    JSON,
+    Json,
     Yaml,
     Toml,
-    CSV,
 }
 
 #[derive(Parser, Debug)]
+#[command(about)]
 pub struct Args {
-    /// path to source file
+    /// path to an optional source file.
+    /// if no path is provided, will read from stdin.
     #[clap(short, long)]
-    source_path: PathBuf,
+    source_path: Option<PathBuf>,
 
-    /// path to destination file.
-    /// if no path is provided,
-    /// will output to stdout.
+    /// optional path to write conversion results.
+    /// if no path is provided, will output to stdout.
     #[clap(short, long)]
     dest_path: Option<PathBuf>,
 
-    /// conversion to do:
-    ///     JY  json to yaml
-    ///     YJ  yaml to json
-    ///     JT  json to toml
-    ///     TJ  toml to json
-    ///     YT  yaml to toml
-    ///     TY  toml to yaml
-    #[clap(required=true, value_parser = parse_conversion)]
+    /// file conversion to do:
+    ///     JY: json to yaml
+    ///     YJ: yaml to json
+    ///     JT: json to toml
+    ///     TJ: toml to json
+    ///     YT: yaml to toml
+    ///     TY: toml to yaml
+    #[clap(required=true, value_parser=parse_conversion)]
     conversion: (Format, Format),
 }
 
 fn parse_conversion(conversion: &str) -> Result<(Format, Format)> {
     let c = match conversion.to_uppercase().as_str() {
-        "JY" => (Format::JSON, Format::Yaml),
-        "JT" => (Format::JSON, Format::Toml),
-        "YJ" => (Format::Yaml, Format::JSON),
+        "JY" => (Format::Json, Format::Yaml),
+        "JT" => (Format::Json, Format::Toml),
+        "YJ" => (Format::Yaml, Format::Json),
         "YT" => (Format::Yaml, Format::Toml),
-        "TJ" => (Format::Toml, Format::JSON),
-        "TY" => (Format::Toml, Format::JSON),
+        "TJ" => (Format::Toml, Format::Json),
+        "TY" => (Format::Toml, Format::Yaml),
         _ => {
             return Err(anyhow!("conversion unsupported"));
         }
@@ -52,60 +52,71 @@ fn parse_conversion(conversion: &str) -> Result<(Format, Format)> {
     Ok(c)
 }
 
-fn yaml_to_json(src_path: &Path) -> Result<String> {
-    let yaml_file = File::open(src_path)?;
-    let json_data: serde_json::Value = serde_yaml::from_reader(BufReader::new(yaml_file))?;
-    Ok(serde_json::to_string_pretty(&json_data)?)
+fn yaml_to_json(data: &str) -> Result<String> {
+    let yaml_data: serde_yaml::Value = serde_yaml::from_str(data)?;
+    Ok(serde_json::to_string_pretty(&yaml_data)?)
 }
 
-fn yaml_to_toml(src_path: &Path) -> Result<String> {
-    let yaml_file = File::open(src_path)?;
-    let yaml_value: serde_yaml::Value = serde_yaml::from_reader(BufReader::new(yaml_file))?;
-    Ok(toml::to_string(&yaml_value)?)
+fn yaml_to_toml(data: &str) -> Result<String> {
+    let yaml_data: serde_yaml::Value = serde_yaml::from_str(data)?;
+    Ok(toml::to_string(&yaml_data)?)
 }
 
-fn json_to_yaml(src_path: &Path) -> Result<String> {
-    let json_file = File::open(src_path)?;
-    let yaml_data: serde_yaml::Value = serde_json::from_reader(BufReader::new(json_file))?;
-    Ok(serde_yaml::to_string(&yaml_data)?)
+fn json_to_yaml(data: &str) -> Result<String> {
+    let json_data: serde_json::Value = serde_json::from_str(data)?;
+    Ok(serde_yaml::to_string(&json_data)?)
 }
 
-fn json_to_toml(src_path: &Path) -> Result<String> {
-    let json_file = File::open(src_path)?;
-    let json_value: serde_json::Value = serde_json::from_reader(BufReader::new(json_file))?;
-    Ok(toml::to_string(&json_value)?)
+fn json_to_toml(data: &str) -> Result<String> {
+    let json_data: serde_json::Value = serde_json::from_str(data)?;
+    Ok(toml::to_string(&json_data)?)
 }
 
-fn toml_to_json(src_path: &Path) -> Result<String> {
-    let toml_data = fs::read_to_string(src_path)?;
-    let json_data: serde_json::Value = toml::from_str(&toml_data)?;
-    Ok(serde_json::to_string_pretty(&json_data)?)
+fn toml_to_json(data: &str) -> Result<String> {
+    let toml_data: toml::Value = toml::de::from_str(data)?;
+    Ok(serde_json::to_string_pretty(&toml_data)?)
 }
 
-fn toml_to_yaml(src_path: &Path) -> Result<String> {
-    let toml_data = fs::read_to_string(src_path)?;
-    let yaml_data: serde_yaml::Value = toml::from_str(&toml_data)?;
-    Ok(serde_yaml::to_string(&yaml_data)?)
+fn toml_to_yaml(data: &str) -> Result<String> {
+    let toml_data: toml::Value = toml::de::from_str(data)?;
+    Ok(serde_yaml::to_string(&toml_data)?)
 }
+
+type ConversionFn = fn(&str) -> Result<String>;
+type FormatPair = (Format, Format);
 
 pub fn run(args: Args) -> Result<()> {
-    let mut conversions: HashMap<(Format, Format), fn(&Path) -> Result<String>> = HashMap::new();
-    conversions.insert((Format::Yaml, Format::JSON), yaml_to_json); 
+    let mut conversions: HashMap<FormatPair, ConversionFn> = HashMap::new();
+    conversions.insert((Format::Yaml, Format::Json), yaml_to_json); 
     conversions.insert((Format::Yaml, Format::Toml), yaml_to_toml);
-    conversions.insert((Format::JSON, Format::Yaml), json_to_yaml);
-    conversions.insert((Format::JSON, Format::Toml), json_to_toml);
-    conversions.insert((Format::Toml, Format::JSON), toml_to_json);
+    conversions.insert((Format::Json, Format::Yaml), json_to_yaml);
+    conversions.insert((Format::Json, Format::Toml), json_to_toml);
+    conversions.insert((Format::Toml, Format::Json), toml_to_json);
     conversions.insert((Format::Toml, Format::Yaml), toml_to_yaml);
 
     let conversion_fn = conversions.get(&args.conversion).ok_or_else(|| {
         io::Error::new(io::ErrorKind::NotFound, "Conversion function not found")
     })?;
-    let data = conversion_fn(&args.source_path)?;
-    if let Some(path) = args.dest_path {
-        write_data(&path, &data)?;
+
+    let data = if let Some(path) = args.source_path {
+        let file = File::open(path)?;
+        let mut reader = BufReader::new(file);
+        let mut input = String::new();
+        reader.read_to_string(&mut input)?;
+        input
     } else {
-        println!("{}", &data);
+        let mut input = String::new();
+        io::stdin().read_to_string(&mut input)?;
+        input
+    };
+
+    let converted_data = conversion_fn(&data)?;
+    if let Some(path) = args.dest_path {
+        write_data(&path, &converted_data)?;
+    } else {
+        println!("{}", &converted_data);
     }
+
     Ok(())
 }
 
@@ -118,6 +129,7 @@ fn write_data(path: impl AsRef<Path>, data: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
 
     fn compare_json_str(expected: &str, actual: &str) {
         let expected_json: serde_json::Value = serde_json::from_str(expected).unwrap();
@@ -139,48 +151,48 @@ mod tests {
 
     #[test]
     fn json_to_yaml_success() {
-        let path = PathBuf::from("tests/data/test.json");
-        let yaml_data = json_to_yaml(&path).unwrap();
+        let data = fs::read_to_string("tests/data/test.json").unwrap();
+        let yaml_data = json_to_yaml(&data).unwrap();
         let expected = fs::read_to_string("tests/data/test.yaml").unwrap();
         compare_yaml_str(&expected, &yaml_data);
     }
 
     #[test]
     fn json_to_toml_success() {
-        let path = PathBuf::from("tests/data/test.json");
-        let toml_data = json_to_toml(&path).unwrap();
+        let data = fs::read_to_string("tests/data/test.json").unwrap();
+        let toml_data = json_to_toml(&data).unwrap();
         let expected = fs::read_to_string("tests/data/test.toml").unwrap();
         compare_toml_str(&expected, &toml_data);
     }
 
     #[test]
     fn yaml_to_json_success() {
-        let path = PathBuf::from("tests/data/test.yaml");
-        let json_data = yaml_to_json(&path).unwrap();
+        let data = fs::read_to_string("tests/data/test.yaml").unwrap();
+        let json_data = yaml_to_json(&data).unwrap();
         let expected = fs::read_to_string("tests/data/test.json").unwrap();
         compare_json_str(&expected, &json_data);
     }
 
     #[test]
     fn yaml_to_toml_success() {
-        let path = PathBuf::from("tests/data/test.yaml");
-        let toml_data = yaml_to_toml(&path).unwrap();
+        let data = fs::read_to_string("tests/data/test.yaml").unwrap();
+        let toml_data = yaml_to_toml(&data).unwrap();
         let expected = fs::read_to_string("tests/data/test.toml").unwrap();
         compare_toml_str(&expected, &toml_data);
     }
 
     #[test]
     fn toml_to_json_success() {
-        let path = PathBuf::from("tests/data/test.toml");
-        let json_data = toml_to_json(&path).unwrap();
+        let data = fs::read_to_string("tests/data/test.toml").unwrap();
+        let json_data = toml_to_json(&data).unwrap();
         let expected = fs::read_to_string("tests/data/test.json").unwrap();
         compare_json_str(&expected, &json_data);
     }
 
     #[test]
     fn toml_to_yaml_success() {
-        let path = PathBuf::from("tests/data/test.toml");
-        let yaml_data = toml_to_yaml(&path).unwrap();
+        let data = fs::read_to_string("tests/data/test.toml").unwrap();
+        let yaml_data = toml_to_yaml(&data).unwrap();
         let expected = fs::read_to_string("tests/data/test.yaml").unwrap();
         compare_yaml_str(&expected, &yaml_data);
     }
