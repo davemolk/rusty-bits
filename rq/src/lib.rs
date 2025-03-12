@@ -2,6 +2,7 @@ use core::str;
 use std::fs;
 use std::path::{PathBuf, Path};
 use std::str::FromStr;
+use std::io::Write;
 
 use anyhow::{anyhow, Context, Result};
 use clap::Parser;
@@ -10,6 +11,7 @@ use reqwest::{
     Method,
     blocking::{Request, Client, multipart},
 };
+use url::Url;
 use serde_json::Value;
 
 const USER_AGENT_DEFAULT: &str = "github.com/davemolk/rusty-bits/rq";
@@ -100,6 +102,14 @@ pub struct Args {
     /// this option.
     #[clap(long)]
     user_agent: Option<String>,
+
+    /// download file to provided path.
+    #[clap(long)]
+    download: Option<String>,
+
+    /// pretty-print json file.
+    #[clap(long="pp")]
+    pretty_print: bool,
 }
 
 pub fn run(mut args: Args) -> Result<()> {
@@ -123,7 +133,11 @@ pub fn run(mut args: Args) -> Result<()> {
         return Ok(());
     }
 
-    let data = client.execute(req)?;
+    let mut data = client.execute(req)?;
+
+    if !data.status().is_success() {
+        eprintln!("status: {:?}",data.status().canonical_reason())
+    }
 
     if args.verbose {
         println!("{:?} {:?} {:?}", data.version(), data.status(), data.status().canonical_reason().unwrap_or_default());
@@ -132,8 +146,24 @@ pub fn run(mut args: Args) -> Result<()> {
         }
         println!();
     }
-    
-    println!("{}", data.text()?);
+
+    if let Some(download_path) = args.download {
+        let mut file = fs::File::create(&download_path)?;
+        println!("downloading file...");
+        file.write_all(&mut data.bytes()?)?;
+        return Ok(());
+    }
+
+    if args.pretty_print {
+        let json_res: Value = serde_json::from_reader(&mut data)?;
+        match serde_json::to_string_pretty(&json_res) {
+            Ok(pp) => println!("{pp}"),
+            // just print it
+            Err(_) => println!("{:?}", data.text()),
+        }
+    } else {
+        println!("{}", data.text()?);
+    }
     Ok(())
 }
 
@@ -163,16 +193,17 @@ fn build_client(args: &mut Args) -> Result<Client> {
 }
 
 fn build_request(args: &mut Args, client: &Client) -> Result<Request> {    
-    // todo: validate url
+    let url = Url::parse(&args.url)
+        .with_context(|| format!("{} cannot be parsed as url", args.url))?;
 
     let mut req_builder = match args.method {
-        Method::GET => client.get(&args.url),
-        Method::HEAD => client.head(&args.url),
-        Method::POST => client.post(&args.url),
-        Method::PUT => client.put(&args.url),
-        Method::PATCH => client.patch(&args.url),
-        Method::DELETE => client.delete(&args.url),
-        _ => client.get(&args.url),
+        Method::GET => client.get(url),
+        Method::HEAD => client.head(url),
+        Method::POST => client.post(url),
+        Method::PUT => client.put(url),
+        Method::PATCH => client.patch(url),
+        Method::DELETE => client.delete(url),
+        _ => client.get(url),
     };
 
     req_builder = req_builder
